@@ -1,9 +1,0 @@
--Party arrives to Normal town after receiving a strange book that lets them return to saved locations
--Locations are saved by finding some crystals in the demo, but in Abandoned town, it is added by
-an alternate location.
--Researching Abandoned town, party gets Tent, which link transfers them from anywhere into a camp
-where they can rest.
-- They also turn a magic circle that teleports normally into a dungeon. They get trapped there
-but they can just use the book to go out.
-- In the dungeon, they find a Castle in a Bottle they can use via Link transfer from anywhere.
-
