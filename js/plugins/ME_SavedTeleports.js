@@ -1,7 +1,7 @@
 /*:
- * Version 1.0.0
+ * Version 1.1.0
  * @target MZ
- * Last update 18/03/21
+ * Last update 09/04/22
  * @author myenemy
  * @plugindesc Name teleports to use them later!
  * 
@@ -22,11 +22,11 @@
  * @desc Sends the player to saved location by name
  * 
  * @command link
- * @text Link transfer
+ * @text Link Transfer
  * @arg Name
  * 
  * @command return
- * @text Link return
+ * @text Link Return
  * @arg Name
  * 
  * 
@@ -44,7 +44,7 @@
  * Just like editor transfer player option, "Map" is the map to be teleported when you call it, "X" the X coordinate in the map and "Y" the Y coordinate in the map.
  * "Direction" is where the character will face. 1 for down, 2 for left, 3 for right, 4 for up. 0 is "retain".
  * Trasition is the effect to apply on this transfer, 0 for black screen, 1 for white screen, any other for no effect.
- * 
+ * Do not use "return_" in your names or you might glitch your game!
  * 
  * If you don't set "Type", "Direction" and "Transition", they will be set to 0!
  * Also, if you only type the Name, Map, X and Y will be set to current location.
@@ -58,10 +58,6 @@
  * - Link return
  * Returns the player to the last spot Link transfer was used
  * 
- * 
- * Script calls:
- * $gamePlayer.ME_savedTeleports.has("name")
- * Checks if "name" was saved or not. Keep the quotation marks.
  * 
  * ==============================================
  * @Terms of use
@@ -89,21 +85,81 @@
  *
  */
 
-Game_Player.prototype.ME_savedTeleports=new Map();
+
+Game_Player.prototype.ME_SavedTeleports;
+
+function ME_SavedTeleports()
+{
+};
+
+ME_SavedTeleports._list=null;
+
+ME_SavedTeleports.saveGame = Game_System.prototype.onBeforeSave;
+ME_SavedTeleports.loadGame = Game_System.prototype.onAfterLoad;
+
+ME_SavedTeleports.isInitialized = function()
+{
+	return $gamePlayer && ME_SavedTeleports._list instanceof Map && ME_SavedTeleports._list.size>0;
+};
+
+ME_SavedTeleports.exists = function(name)
+{
+	return ME_SavedTeleports.isInitialized && ME_SavedTeleports._list.has(name);
+};
+
+ME_SavedTeleports.initialize = function()
+{
+	ME_SavedTeleports._list = new Map();
+};
+
+ME_SavedTeleports.checkName = function(name)
+{
+	return name && name.length > 2 && !name.match(/^\d/)
+};
+
+ME_SavedTeleports.save = function(name, type, map, x, y, dir, transition)
+{
+	
+	if (!ME_SavedTeleports.isInitialized())
+	{
+		ME_SavedTeleports.initialize();
+	};
+	
+	if (ME_SavedTeleports.checkName(name))
+	{
+		ME_SavedTeleports._list.set(name, [type, map, x, y, dir, transition]);
+		return true;
+	}
+	else
+	{
+		console.log("Name cannot be saved");
+		return false;
+	}
+};
+
+ME_SavedTeleports.mapToArray = function()
+{
+	$gamePlayer.ME_SavedTeleports = Array.from(ME_SavedTeleports._list.entries())
+};
+
+ME_SavedTeleports.arrayToMap = function()
+{
+	ME_SavedTeleports._list = new Map($gamePlayer.ME_SavedTeleports);
+};
+
 
 PluginManager.registerCommand("ME_SavedTeleports","save",args => {
-	if (args&&args["Name"]&&!args["Name"].match(/^\d/))
+	if (args&&ME_SavedTeleports.checkName(args["Name"]))
 	{
-		var name=args["Name"];
-
-		var type=parseInt(args["Type"])||0;
-		var map=parseInt(args["Map"])||$gameMap._mapId;
-		var x=parseInt(args["X"])||$gamePlayer._x;
-		var y=parseInt(args["Y"])||$gamePlayer._y;
-		var direction=parseInt(args["Direction"])||0;
-		var transition=args["Transition"]||0;
+		var name = args["Name"];
+		var type = parseInt(args["Type"])||0;
+		var map = parseInt(args["Map"])||$gameMap._mapId;
+		var x = parseInt(args["X"])||$gamePlayer._x;
+		var y = parseInt(args["Y"])||$gamePlayer._y;
+		var direction = parseInt(args["Direction"])||0;
+		var transition = args["Transition"]||0;
 		
-		$gamePlayer.ME_savedTeleports.set(name,[type,map,x,y,direction,transition]);		
+		ME_SavedTeleports.save(name, type, map, x, y, direction, transition);
 	}
 });
 
@@ -112,12 +168,12 @@ PluginManager.registerCommand("ME_SavedTeleports","transfer",args => {
 	
 	if (args)
 	{
-		var name= args["Name"];
-		if (name&&!name.match(/^\d/))
+		var name = args["Name"];
+		if (ME_SavedTeleports.checkName(name))
 		{
-			if ($gamePlayer.ME_savedTeleports.has(name))
+			if (ME_SavedTeleports.exists(name))
 			{
-				var params=$gamePlayer.ME_savedTeleports.get(args["Name"]);
+				var params = ME_SavedTeleports._list.get(args["Name"]);
 			
 				return Game_Interpreter.prototype.command201(params);
 			}
@@ -128,20 +184,22 @@ PluginManager.registerCommand("ME_SavedTeleports","transfer",args => {
 
 PluginManager.registerCommand("ME_SavedTeleports","link",args => {
 	
-	if (args&&args["Name"]&&!args["Name"].match(/^\d/))
+	if (args)
 	{
-		var name=args["Name"];
-		var params=$gamePlayer.ME_savedTeleports.get(name);
-
-		var type=0;
-		var map=$gameMap._mapId;
-		var x=$gamePlayer._x;
-		var y=$gamePlayer._y;
-		var direction=$gamePlayer.direction()||0;
-		var transition=params[5]||2;
-		
-		$gamePlayer.ME_savedTeleports.set("return_"+name,[type,map,x,y,direction,transition]);
-		return Game_Interpreter.prototype.command201(params);
+		var name = args["Name"];
+		if (ME_SavedTeleports.checkName(name))
+		{
+			var params = ME_SavedTeleports._list.get(name);
+			
+			var type = 0;
+			var map = $gameMap._mapId;
+			var x = $gamePlayer._x;
+			var y = $gamePlayer._y;
+			var direction = $gamePlayer.direction()||0;
+			var transition = parseInt(params[5]) || 2;
+			ME_SavedTeleports.save( "return_" + name, type, map, x, y, direction, transition);
+			return Game_Interpreter.prototype.command201(params);
+		}
 	}
 	return false;
 });
@@ -150,18 +208,28 @@ PluginManager.registerCommand("ME_SavedTeleports","return",args => {
 	
 	if (args)
 	{
-		var name= args["Name"];
-		if (name&&!name.match(/^\d/))
-		{
-			name="return_"+name;
+		var name = args["Name"];
+		if (ME_SavedTeleports.checkName(name))
+		{ 
+			name = "return_" + name;
 
-			if ($gamePlayer.ME_savedTeleports.has(name))
+			if (ME_SavedTeleports.exists(name))
 			{
-				var params=$gamePlayer.ME_savedTeleports.get(args["Name"]);
-			
+				var params = ME_SavedTeleports._list.get(name);
 				return Game_Interpreter.prototype.command201(params);
 			}
 		}
 	}
 	return false;
 });
+
+
+Game_System.prototype.onBeforeSave = function() {
+	ME_SavedTeleports.saveGame.call(this);
+	ME_SavedTeleports.mapToArray();
+};
+
+Game_System.prototype.onAfterLoad = function() {
+	ME_SavedTeleports.loadGame.call(this);
+	ME_SavedTeleports.arrayToMap();
+};
